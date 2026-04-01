@@ -4,7 +4,7 @@
   "metadata": {
     "colab": {
       "provenance": [],
-      "authorship_tag": "ABX9TyPK5hd7Z8MzFbXJ25EUHj0w"
+      "authorship_tag": "ABX9TyOwW6shVaHt7WVg12tcLgrT"
     },
     "kernelspec": {
       "name": "python3",
@@ -52,7 +52,7 @@
         "id": "x6WeOYpvnh6q",
         "outputId": "56c74709-14e6-4a65-e4fd-f21cfc2ae5e3"
       },
-      "execution_count": 1,
+      "execution_count": null,
       "outputs": [
         {
           "output_type": "stream",
@@ -85,7 +85,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 2,
+      "execution_count": null,
       "metadata": {
         "colab": {
           "base_uri": "https://localhost:8080/"
@@ -192,7 +192,7 @@
         "id": "Vv7BLJlEoHnr",
         "outputId": "118b87f4-bf35-4150-bd34-1e3447dd5729"
       },
-      "execution_count": 3,
+      "execution_count": null,
       "outputs": [
         {
           "output_type": "stream",
@@ -268,7 +268,7 @@
         "id": "6kgUVbnvoZJp",
         "outputId": "eb103280-6899-4a27-c22f-b9c6060795cb"
       },
-      "execution_count": 4,
+      "execution_count": null,
       "outputs": [
         {
           "output_type": "stream",
@@ -325,7 +325,7 @@
         "id": "7vTgD16Loo4H",
         "outputId": "e7de0278-4907-451a-fcb0-2c497a13f4c8"
       },
-      "execution_count": 5,
+      "execution_count": null,
       "outputs": [
         {
           "output_type": "stream",
@@ -341,16 +341,64 @@
     },
     {
       "cell_type": "code",
-      "source": [],
+      "source": [
+        "import json\n",
+        "\n",
+        "class SiliconSlicer:\n",
+        "    def __init__(self, laser_spot_size=0.005): # 5 microns\n",
+        "        self.spot = laser_spot_size\n",
+        "        self.gcode = []\n",
+        "\n",
+        "    def process_eda_layer(self, layer_type, geometry):\n",
+        "        if layer_type == \"POWER_RAIL\":\n",
+        "            # Treat as \"Fill\" - Like a 3D printer's Infill\n",
+        "            self.generate_raster_fill(geometry)\n",
+        "        elif layer_type == \"GATE_ETCH\":\n",
+        "            # Treat as \"Perimeter\" - High precision vector path\n",
+        "            self.generate_vector_trace(geometry)\n",
+        "\n",
+        "    def generate_vector_trace(self, paths):\n",
+        "        self.gcode.append(\"; --- START CRITICAL GATE ETCH ---\")\n",
+        "        for p in paths:\n",
+        "            self.gcode.append(f\"G0 X{p['x1']} Y{p['y1']}\")\n",
+        "            self.gcode.append(f\"M3 S255 ; Laser Max Power\")\n",
+        "            self.gcode.append(f\"G1 X{p['x2']} Y{p['y2']} F50 ; Slow & Precise\")\n",
+        "            self.gcode.append(\"M5\")\n",
+        "\n",
+        "    def export(self):\n",
+        "        return \"\\n\".join(self.gcode)\n",
+        "\n",
+        "# --- ACTION ---\n",
+        "# This is how you'd convert a Power IC Gate to G-code\n",
+        "etch_tool = SiliconSlicer()\n",
+        "etch_tool.process_eda_layer(\"GATE_ETCH\", [{\"x1\": 5.001, \"y1\": 2.0, \"x2\": 5.001, \"y2\": 10.0}])\n",
+        "print(etch_tool.export())"
+      ],
       "metadata": {
-        "id": "9yJe4tcwqbmh"
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "_jAkPOStejf9",
+        "outputId": "4df62412-eef9-43fa-bf69-f70efd908c39"
       },
-      "execution_count": null,
-      "outputs": []
+      "execution_count": 1,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "; --- START CRITICAL GATE ETCH ---\n",
+            "G0 X5.001 Y2.0\n",
+            "M3 S255 ; Laser Max Power\n",
+            "G1 X5.001 Y10.0 F50 ; Slow & Precise\n",
+            "M5\n"
+          ]
+        }
+      ]
     },
     {
       "cell_type": "code",
-      "execution_count": 6,
+      "execution_count": null,
       "metadata": {
         "colab": {
           "base_uri": "https://localhost:8080/",
@@ -438,6 +486,84 @@
         "\n",
         "# Run the visualizer. This generates the chart.\n",
         "visualize_nanoprint(design_data)\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "!pip install svgpathtools\n",
+        "import svgpathtools\n",
+        "import json\n",
+        "\n",
+        "class NanoSlicerCore:\n",
+        "    def __init__(self, laser_min_power=0, laser_max_power=255):\n",
+        "        self.min_p = laser_min_power\n",
+        "        self.max_p = laser_max_power\n",
+        "        self.gcode = []\n",
+        "\n",
+        "    def svg_to_nanogcode(self, svg_file, output_file):\n",
+        "        # 1. Parse the SVG paths\n",
+        "        paths, attributes = svgpathtools.svg2paths(svg_file)\n",
+        "\n",
+        "        self.gcode.append(\"; --- ASH-NANO-SLICER INITIALIZED ---\")\n",
+        "        self.gcode.append(\"G21 ; Millimeters\")\n",
+        "        self.gcode.append(\"G90 ; Absolute Positioning\")\n",
+        "\n",
+        "        for i, (path, attr) in enumerate(zip(paths, attributes)):\n",
+        "            # 2. Logic Check: Is this a \"Critical\" or \"Macro\" path?\n",
+        "            # We use SVG 'stroke-width' or 'id' to decide\n",
+        "            is_critical = \"critical\" in attr.get('id', '').lower()\n",
+        "            power = self.max_p if is_critical else 150 # Lower power for bulk\n",
+        "            feed = 50 if is_critical else 500         # Slower for critical lines\n",
+        "\n",
+        "            self.gcode.append(f\"; Path {i}: {attr.get('id', 'unnamed')}\")\n",
+        "\n",
+        "            # 3. Convert SVG Curves to G-Code Segments\n",
+        "            for segment in path:\n",
+        "                start = segment.start\n",
+        "                end = segment.end\n",
+        "\n",
+        "                # Move to Start (Laser OFF)\n",
+        "                self.gcode.append(f\"G0 X{round(start.real, 4)} Y{round(start.imag, 4)} M5\")\n",
+        "                # Etch to End (Laser ON)\n",
+        "                self.gcode.append(f\"G1 X{round(end.real, 4)} Y{round(end.imag, 4)} S{power} F{feed} M3\")\n",
+        "\n",
+        "        # 4. Save to File\n",
+        "        with open(output_file, 'w') as f:\n",
+        "            f.write(\"\\n\".join(self.gcode))\n",
+        "        print(f\"Successfully sliced {len(paths)} paths to {output_file}\")\n",
+        "\n",
+        "# --- ACTION ---\n",
+        "# slicer = NanoSlicerCore()\n",
+        "# slicer.svg_to_nanogcode('power_ic_design.svg', 'wafer_etch.gcode')"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "j8wOd97We2X3",
+        "outputId": "b208fb64-9de3-4ae9-b47b-56306900e1bb"
+      },
+      "execution_count": 3,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Collecting svgpathtools\n",
+            "  Downloading svgpathtools-1.7.2-py2.py3-none-any.whl.metadata (22 kB)\n",
+            "Requirement already satisfied: numpy in /usr/local/lib/python3.12/dist-packages (from svgpathtools) (2.0.2)\n",
+            "Collecting svgwrite (from svgpathtools)\n",
+            "  Downloading svgwrite-1.4.3-py3-none-any.whl.metadata (8.8 kB)\n",
+            "Requirement already satisfied: scipy in /usr/local/lib/python3.12/dist-packages (from svgpathtools) (1.16.3)\n",
+            "Downloading svgpathtools-1.7.2-py2.py3-none-any.whl (68 kB)\n",
+            "\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m68.3/68.3 kB\u001b[0m \u001b[31m2.7 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[?25hDownloading svgwrite-1.4.3-py3-none-any.whl (67 kB)\n",
+            "\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m67.1/67.1 kB\u001b[0m \u001b[31m6.3 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[?25hInstalling collected packages: svgwrite, svgpathtools\n",
+            "Successfully installed svgpathtools-1.7.2 svgwrite-1.4.3\n"
+          ]
+        }
       ]
     }
   ]
